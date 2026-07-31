@@ -1,0 +1,472 @@
+/* ==========================================================================
+   Surya Devarabhotla — Portfolio
+   Design concept: "Systems Console" — amber phosphor CRT terminal.
+   Content rendered as real terminal output: systemctl status, tailed
+   logs, curl responses. Monospace throughout is a deliberate, coherent
+   constraint here, not a compromise.
+   ========================================================================== */
+
+:root {
+  --bg: #0a0904;
+  --panel: #120f08;
+  --panel-2: #17130a;
+  --border: rgba(255, 176, 0, 0.22);
+  --border-strong: rgba(255, 176, 0, 0.42);
+
+  --amber: #ffc562;
+  --amber-bright: #ffe3ab;
+  --amber-dim: #b9863c;
+  --amber-faint: #6b5127;
+
+  --green: #3ddc72;
+  --red: #ff5f56;
+  --yellow: #ffbd2e;
+  --cyan: #6fd4c9;
+
+  --font-mono: "JetBrains Mono", "IBM Plex Mono", "SFMono-Regular", monospace;
+  --font-display: "VT323", var(--font-mono);
+
+  --max-w: 980px;
+  --gutter: clamp(1rem, 4vw, 2.4rem);
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--amber);
+  font-family: var(--font-mono);
+  font-size: 15.5px;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+  position: relative;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* Scanlines + vignette overlay */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.18) 0px,
+    rgba(0, 0, 0, 0.18) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  mix-blend-mode: multiply;
+  opacity: 0.55;
+}
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 199;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.55) 130%);
+}
+
+a { color: var(--cyan); text-decoration: none; }
+a:hover, a:focus-visible { text-decoration: underline; }
+
+.container { max-width: var(--max-w); margin: 0 auto; padding: 0 var(--gutter); }
+
+.prompt-label { color: var(--amber-dim); }
+.prompt-cmd { color: var(--amber-bright); }
+
+#skipnav a {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  background: var(--amber);
+  color: #0a0904;
+  padding: 0.6em 1em;
+  z-index: 999;
+}
+#skipnav a:focus { left: var(--gutter); top: var(--gutter); }
+
+/* ---------- Nav ---------- */
+.mainnav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 100;
+  background: rgba(10, 9, 4, 0.88);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--border);
+}
+.mainnav .container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 52px;
+  font-size: 0.88rem;
+}
+.brand { color: var(--amber-dim); }
+.brand strong { color: var(--amber-bright); }
+.navlinks {
+  display: flex;
+  gap: 1.4rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.navlinks a { color: var(--amber-dim); }
+.navlinks a::before { content: "$ "; color: var(--amber-faint); }
+.navlinks a:hover, .navlinks a:focus-visible { color: var(--amber-bright); text-decoration: none; }
+
+.nav-toggle {
+  display: none;
+  background: none;
+  border: 1px solid var(--border-strong);
+  color: var(--amber);
+  padding: 0.4em 0.6em;
+  font-family: var(--font-mono);
+}
+@media (max-width: 720px) {
+  .navlinks {
+    position: absolute;
+    top: 52px; left: 0; right: 0;
+    background: var(--panel);
+    flex-direction: column;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.25s ease;
+  }
+  .navlinks.open { max-height: 260px; }
+  .navlinks li { border-top: 1px solid var(--border); }
+  .navlinks a { display: block; padding: 0.9rem var(--gutter); }
+  .nav-toggle { display: inline-flex; }
+}
+
+/* ---------- Hero: boot sequence ---------- */
+.hero { padding: 110px 0 4rem; }
+
+.hero-grid {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: clamp(1.6rem, 4vw, 3rem);
+  align-items: start;
+}
+.hero-grid > div:first-child { min-width: 0; }
+@media (max-width: 860px) {
+  .hero-grid { grid-template-columns: 1fr; }
+  .cam-panel { max-width: 320px; margin: 0 auto; }
+}
+
+/* Camera feed panel */
+.cam-panel {
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--panel);
+  box-shadow: 0 0 26px rgba(255, 176, 0, 0.10);
+  width: 100%;
+  max-width: 300px;
+  justify-self: end;
+  min-width: 0;
+}
+@media (max-width: 860px) { .cam-panel { justify-self: center; } }
+.termwin-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.cam-frame {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+}
+.cam-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  filter: grayscale(1) sepia(0.65) hue-rotate(-8deg) saturate(2.6) brightness(0.82) contrast(1.15);
+  -webkit-user-drag: none;
+  user-drag: none;
+  -webkit-touch-callout: none;
+  pointer-events: none;
+}
+.cam-shield {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: transparent;
+}
+.cam-frame::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0,0,0,0.35) 0px,
+    rgba(0,0,0,0.35) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  pointer-events: none;
+}
+.cam-frame::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.6) 130%);
+  pointer-events: none;
+}
+.cam-tag {
+  position: absolute;
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  color: var(--amber-bright);
+  text-shadow: 0 0 6px rgba(0,0,0,0.8);
+  display: flex;
+  align-items: center;
+  gap: 0.3em;
+  z-index: 2;
+}
+.cam-tag-tl { top: 0.6rem; left: 0.6rem; color: var(--red); }
+.cam-tag-tr { top: 0.6rem; right: 0.6rem; }
+.cam-tag-bl { bottom: 0.6rem; left: 0.6rem; }
+.cam-tag-br { bottom: 0.6rem; right: 0.6rem; color: var(--green); }
+.cam-rec-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--red);
+  box-shadow: 0 0 6px var(--red);
+  animation: rec-blink 1.4s ease-in-out infinite;
+}
+@keyframes rec-blink { 50% { opacity: 0.15; } }
+
+.boot-log {
+  margin: 0 0 1.6rem;
+  font-size: 0.82rem;
+  color: var(--amber-faint);
+  white-space: pre-wrap;
+}
+.boot-log .ok { color: var(--green); }
+
+.hero-prompt-line { color: var(--amber-dim); font-size: 0.95rem; }
+
+.hero-name {
+  margin: 0.5rem 0 0;
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 4.4vw, 3.6rem);
+  line-height: 1.05;
+  color: var(--amber-bright);
+  text-shadow: 0 0 14px rgba(255, 197, 98, 0.35);
+}
+.hero-name .typed-text::after {
+  content: "▌";
+  display: inline-block;
+  margin-left: 0.12em;
+  color: var(--amber);
+  animation: blink-caret 0.8s step-end infinite;
+}
+@keyframes blink-caret { 50% { opacity: 0; } }
+@media (max-width: 900px) {
+  .hero-name { font-size: clamp(2rem, 9vw, 3rem); }
+}
+
+.hero-role {
+  margin-top: 1.1rem;
+  font-size: clamp(1rem, 2vw, 1.15rem);
+  color: var(--amber);
+}
+.hero-role strong { color: var(--cyan); }
+.hero-desc {
+  margin-top: 0.9rem;
+  max-width: 62ch;
+  color: var(--amber-dim);
+}
+
+.hero-cta {
+  margin-top: 1.8rem;
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  padding: 0.75em 1.2em;
+  border: 1px solid var(--border-strong);
+  color: var(--amber);
+  transition: background 0.2s ease, color 0.2s ease;
+}
+.btn::before { content: "$ "; color: var(--amber-faint); }
+.btn-primary { background: var(--amber); color: #0a0904; border-color: var(--amber); font-weight: 600; }
+.btn-primary::before { color: rgba(10,9,4,0.5); }
+.btn-primary:hover { background: var(--amber-bright); }
+.btn-ghost:hover, .btn-ghost:focus-visible { color: var(--amber-bright); border-color: var(--amber); }
+
+/* ---------- Terminal window panels ---------- */
+section { padding: 3.2rem 0; }
+
+.termwin {
+  border: 1px solid var(--border-strong);
+  background: var(--panel);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.termwin-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.9rem;
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--border);
+}
+.dot { width: 10px; height: 10px; border-radius: 50%; }
+.dot-red { background: var(--red); }
+.dot-yellow { background: var(--yellow); }
+.dot-green { background: var(--green); }
+.termwin-title {
+  margin-left: 0.6rem;
+  font-size: 0.78rem;
+  color: var(--amber-dim);
+}
+.termwin-body { padding: clamp(1.2rem, 3vw, 2rem); }
+
+.section-head { margin-bottom: 1.6rem; }
+.section-head h2 {
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--amber-bright);
+  margin: 0;
+}
+.section-head h2::before { content: "# "; color: var(--amber-faint); }
+
+/* ---------- About: cat about.md ---------- */
+.about-out p { color: var(--amber); margin: 0 0 0.9rem; }
+.about-out .comment { color: var(--amber-faint); }
+
+.stat-strip {
+  display: flex;
+  gap: 2.2rem;
+  margin-top: 1.4rem;
+  padding-top: 1rem;
+  border-top: 1px dashed var(--border);
+  font-size: 0.85rem;
+}
+.stat-num { color: var(--green); font-weight: 700; }
+
+/* systemctl-style skills table */
+.svc-table { width: 100%; border-collapse: collapse; font-size: 0.84rem; margin-top: 1.4rem; }
+.svc-table th {
+  text-align: left;
+  color: var(--amber-faint);
+  font-weight: 500;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--border-strong);
+}
+.svc-table td { padding: 0.42rem 0.6rem; border-bottom: 1px solid var(--border); color: var(--amber); }
+.svc-status { color: var(--green); }
+.svc-status::before { content: "● "; }
+.svc-cat { color: var(--amber-dim); }
+
+/* ---------- Career: tail -f career.log ---------- */
+.log-line { display: flex; gap: 0.7rem; padding: 0.5rem 0; border-bottom: 1px dashed var(--border); font-size: 0.86rem; flex-wrap: wrap; }
+.log-line:last-child { border-bottom: none; }
+.log-ts { color: var(--amber-faint); white-space: nowrap; }
+.log-level { font-weight: 700; white-space: nowrap; }
+.log-level.info { color: var(--cyan); }
+.log-level.live { color: var(--green); }
+.log-msg { color: var(--amber); }
+.log-msg strong { color: var(--amber-bright); }
+.log-note { color: var(--amber-faint); font-style: italic; display: block; margin-top: 0.15rem; }
+.log-tail-cursor { color: var(--green); }
+
+/* ---------- Projects: ls -la ---------- */
+.ls-header { color: var(--amber-faint); font-size: 0.82rem; margin-bottom: 0.6rem; }
+.ls-list { list-style: none; margin: 0 0 1.6rem; padding: 0; font-size: 0.86rem; }
+.ls-list li { display: flex; gap: 0.8rem; padding: 0.3rem 0; color: var(--amber-dim); flex-wrap: wrap; }
+.ls-perm { color: var(--amber-faint); }
+.ls-name { color: var(--cyan); }
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1.2rem;
+}
+.detail-card {
+  border: 1px solid var(--border);
+  padding: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  transition: border-color 0.2s ease;
+}
+.detail-card:hover { border-color: var(--border-strong); }
+.detail-card .file-tag { color: var(--amber-faint); font-size: 0.72rem; }
+.detail-card h3 { font-size: 0.98rem; color: var(--amber-bright); margin: 0; font-weight: 600; }
+.detail-card p { color: var(--amber-dim); font-size: 0.85rem; margin: 0; flex-grow: 1; }
+.detail-placeholder-flag {
+  align-self: flex-start;
+  font-size: 0.65rem;
+  color: var(--yellow);
+  border: 1px dashed var(--yellow);
+  padding: 0.1em 0.5em;
+}
+.detail-link { color: var(--cyan); font-size: 0.82rem; }
+
+/* ---------- Contact: curl output ---------- */
+.curl-cmd { color: var(--amber-dim); font-size: 0.86rem; margin-bottom: 1rem; }
+.json-out { font-size: 0.88rem; }
+.json-key { color: var(--cyan); }
+.json-str { color: var(--amber); }
+.json-punct { color: var(--amber-faint); }
+.contact-links { margin-top: 1.2rem; display: flex; flex-wrap: wrap; gap: 1.5rem; }
+.contact-link { display: flex; align-items: center; gap: 0.5rem; color: var(--amber); }
+.contact-link:hover { color: var(--amber-bright); }
+.contact-link svg { width: 17px; height: 17px; }
+
+.footer-note { text-align: center; margin-top: 2.4rem; font-size: 0.76rem; color: var(--amber-faint); }
+
+.scroll-top {
+  position: fixed;
+  right: 1.2rem;
+  bottom: 1.2rem;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg);
+  color: var(--amber);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(10px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  z-index: 90;
+}
+.scroll-top.visible { opacity: 1; pointer-events: auto; transform: translateY(0); }
+
+.reveal { opacity: 0; transform: translateY(14px); transition: opacity 0.5s ease, transform 0.5s ease; }
+.reveal.in { opacity: 1; transform: translateY(0); }
